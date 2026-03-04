@@ -17,7 +17,11 @@ def fetch_html(url: str, timeout: int = 10) -> str:
     return resp.text
 
 
-def extract_ports_from_html(html: str) -> list[int]:
+def extract_ports_from_html(html: str) -> list[dict]:
+    """Return list of dicts with inferred protocol/service info for each port.
+
+    Each dict: {"port": int, "protocols": [...], "services": [...]}
+    """
     soup = BeautifulSoup(html, "html.parser")
 
     # Gather candidate numbers found near explicit 'port' keywords
@@ -33,7 +37,7 @@ def extract_ports_from_html(html: str) -> list[int]:
         if 0 < num <= 65535:
             candidates.add(num)
 
-    # 2) Look per-sentence: if a sentence contains 'port', capture numbers inside that sentence
+    # 2) Sentence-based scanning for 'port' proximity
     for sentence in re.split(r"[\.\n\r!?]+", text):
         if "port" in sentence.lower():
             for n in re.finditer(r"\b(\d{1,5})\b", sentence):
@@ -65,10 +69,49 @@ def extract_ports_from_html(html: str) -> list[int]:
             if 0 < num <= 65535:
                 candidates.add(num)
 
-    return sorted(candidates)
+    # Now infer protocols/services for each candidate
+    proto_tokens = set(["tcp", "udp", "http", "https", "ssh", "smtp", "imap", "pop3", "rdp", "smb", "snmp", "mssql", "sql", "mongodb"])
+    service_tokens = set(["https", "http", "web", "admin", "api", "backup", "agent", "console", "replication"])
+
+    results: list[dict] = []
+    for port in sorted(candidates):
+        protocols: set[str] = set()
+        services: set[str] = set()
+
+        # Search sentences that mention the port number
+        for sentence in re.split(r"[\.\n\r!?]+", text):
+            if re.search(rf"\b{port}\b", sentence):
+                words = re.findall(r"[A-Za-z0-9_+-]{2,}", sentence)
+                for w in words:
+                    lw = w.lower()
+                    if lw in proto_tokens:
+                        protocols.add(lw)
+                    if lw in service_tokens:
+                        services.add(lw)
+                    # catch uppercase service mentions like HTTPS
+                    if lw.endswith("s") and lw[:-1] in proto_tokens:
+                        protocols.add(lw[:-1])
+
+        # Table context: find td containing the port and look at neighboring cells in the row
+        for td in soup.find_all("td"):
+            if re.search(rf"\b{port}\b", td.get_text()):
+                row = td.find_parent("tr")
+                if row:
+                    cells = [c.get_text(" ").strip() for c in row.find_all(["td","th"]) ]
+                    for c in cells:
+                        for w in re.findall(r"[A-Za-z0-9_+-]{2,}", c):
+                            lw = w.lower()
+                            if lw in proto_tokens:
+                                protocols.add(lw)
+                            if lw in service_tokens:
+                                services.add(lw)
+
+        results.append({"port": port, "protocols": sorted(protocols), "services": sorted(services)})
+
+    return results
 
 
-def crawl(start_url: str, max_pages: int = 50, same_domain: bool = True) -> Iterable[tuple[str, list[int]]]:
+def crawl(start_url: str, max_pages: int = 50, same_domain: bool = True) -> Iterable[tuple[str, list[dict]]]:
     parsed = requests.utils.urlparse(start_url)
     base_netloc = parsed.netloc
 

@@ -8,7 +8,10 @@ import veeam_port_finder.__main__ as vp_main
 
 def test_crawl_writes_excel(tmp_path, monkeypatch):
     # monkeypatch the crawl function to avoid network
-    sample = [("https://example.com/page1", [443, 9443]), ("https://example.com/page2", [6180])]
+    sample = [
+        ("https://example.com/page1", [{"port": 443, "protocols": ["https"], "services": ["https"]}, {"port": 9443, "protocols": [], "services": []}]),
+        ("https://example.com/page2", [{"port": 6180, "protocols": [], "services": []}]),
+    ]
 
     def fake_crawl(url, max_pages=20, same_domain=True):
         for item in sample:
@@ -26,6 +29,8 @@ def test_crawl_writes_excel(tmp_path, monkeypatch):
     df = pd.read_excel(out_file)
     assert "url" in df.columns
     assert "ports" in df.columns
+    assert "protocols" in df.columns
+    assert "services" in df.columns
     urls = list(df["url"])
     assert "https://example.com/page1" in urls
     assert "https://example.com/page2" in urls

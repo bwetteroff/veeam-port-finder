@@ -11,8 +11,13 @@ def test_extract_ports_from_html():
     """
     # include an unrelated number that should be ignored unless heuristics fail
     html += "<p>Build number 9999 - unrelated</p>"
-    ports = extract_ports_from_html(html)
+    port_entries = extract_ports_from_html(html)
+    ports = [p["port"] for p in port_entries]
     assert 443 in ports
     assert 6180 in ports
     assert 9443 in ports
     assert 9999 not in ports
+
+    # check that 443 has an inferred service/protocol (HTTPS was present)
+    entry_443 = next(p for p in port_entries if p["port"] == 443)
+    assert ("https" in entry_443.get("services", [])) or ("https" in entry_443.get("protocols", []))
