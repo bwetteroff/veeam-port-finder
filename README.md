@@ -1,42 +1,64 @@
 # Veeam Port Finder
 
-This script scrapes Veeam documentation pages for port requirements and exports the findings to an Excel file.
+A small utility to discover and collect port requirements from Veeam documentation pages.
 
-Quick start:
+This repository contains the original scripts and a new Python package scaffold (`veeam_port_finder`) with a CLI entrypoint to build on.
 
-1. Create and activate a Python environment (recommended).
+## Features
+
+- Crawl single pages or whole site trees and extract port information from tables and text.
+- Export results to Excel (existing scripts use `pandas` / `openpyxl`).
+- Small CLI scaffold and tests to extend functionality.
+
+## Installation
+
+1. Create and activate a virtual environment (recommended):
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
 
 2. Install dependencies:
 
-```bash
+```powershell
 pip install -r requirements.txt
 ```
 
-3. Run the script for a single page:
+## Usage
 
-```bash
+Run the original script to process a single page:
+
+```powershell
 python VeeamPortFinder.py --url https://helpcenter.veeam.com/docs/backup/compatibility/ports.html --output veeam_ports.xlsx
 ```
 
-4. Or crawl the site for pages with port info (follow same-site links):
+Or (future) use the package CLI scaffold:
 
-```bash
-python VeeamPortFinder.py --url https://helpcenter.veeam.com --follow-links --max-pages 50 --output veeam_ports.xlsx
+```powershell
+python -m veeam_port_finder --version
 ```
 
 Notes:
 
-- The parser looks for HTML tables and paragraph/list items that mention ports. It may need tweaking for specific Veeam pages.
-- If you want tailored parsing for a particular Veeam KB page, I can refine the extraction rules.
+- The current extractor looks for HTML tables and paragraphs/lists mentioning port numbers. Parsing may need refinement for some pages.
+- If you want a focused extractor for a particular Veeam KB page, I can add page-specific rules.
 
-## Scaffolded CLI package
+## Development
 
-I added a small Python CLI scaffold in the `veeam_port_finder` package with a basic entrypoint.
+- Run tests:
 
-Usage (scaffold):
-
-```
-python -m veeam_port_finder --version
+```powershell
+python -m pytest -q
 ```
 
-The package files are in `veeam_port_finder/` and a simple pytest test is in `tests/`.
+- Add features inside `veeam_port_finder/` and add unit tests under `tests/`.
+
+## Contributing
+
+Open an issue or pull request. For local development, create branches from `main` and open PRs when ready.
+
+## Repository
+
+The package is published at: https://github.com/bwetteroff/veeam-port-finder
+
