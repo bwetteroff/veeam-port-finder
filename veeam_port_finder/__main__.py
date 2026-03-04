@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
+
+import pandas as pd
+
 from . import __version__
 from .crawler import crawl
 
@@ -21,6 +25,7 @@ def main(argv: list[str] | None = None) -> int:
     crawl_p.add_argument("--max-pages", type=int, default=20, help="Maximum pages to crawl")
     crawl_p.add_argument("--no-same-domain", dest="same_domain", action="store_false", help="Do not restrict to same domain")
     crawl_p.add_argument("--json", action="store_true", help="Output results as JSON")
+    crawl_p.add_argument("--output", help="Write results to an Excel file (XLSX)")
 
     parser.add_argument("--version", action="store_true", help="Show version and exit")
 
@@ -44,6 +49,15 @@ def main(argv: list[str] | None = None) -> int:
                     print("  ports: none found")
         if args.json:
             print(json.dumps(results))
+
+        if getattr(args, "output", None):
+            out_path = Path(args.output)
+            rows = []
+            for r in results:
+                rows.append({"url": r["url"], "ports": ", ".join(str(p) for p in r["ports"])})
+            df = pd.DataFrame(rows)
+            df.to_excel(out_path, index=False)
+
         return 0
 
     parser.print_help()
