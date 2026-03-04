@@ -9,7 +9,10 @@ def test_extract_ports_from_html():
     <table><tr><td>Port</td><td>9443</td></tr></table>
     </body></html>
     """
+    # include an unrelated number that should be ignored unless heuristics fail
+    html += "<p>Build number 9999 - unrelated</p>"
     ports = extract_ports_from_html(html)
     assert 443 in ports
     assert 6180 in ports
     assert 9443 in ports
+    assert 9999 not in ports

@@ -19,15 +19,53 @@ def fetch_html(url: str, timeout: int = 10) -> str:
 
 def extract_ports_from_html(html: str) -> list[int]:
     soup = BeautifulSoup(html, "html.parser")
-    text = "\n".join(p.get_text(" ") for p in soup.find_all(["p", "li", "td", "th"]))
-    found = set()
-    for m in re.finditer(r"\b(\d{1,5})\b", text):
+
+    # Gather candidate numbers found near explicit 'port' keywords
+    candidates: set[int] = set()
+
+    # Join key textual elements for context scanning
+    text_nodes = [p.get_text(" ") for p in soup.find_all(["p", "li"]) ]
+    text = "\n".join(text_nodes)
+
+    # 1) Direct patterns like 'port 443' or 'ports: 80, 443'
+    for m in re.finditer(r"\b(?:port|ports)\b[^\d\n]*([0-9]{1,5})(?:[^0-9]|$)", text, re.I):
         num = int(m.group(1))
         if 0 < num <= 65535:
-            found.add(num)
-    # prefer numbers near the word 'port' when possible
-    ports = sorted(found)
-    return ports
+            candidates.add(num)
+
+    # 2) Look per-sentence: if a sentence contains 'port', capture numbers inside that sentence
+    for sentence in re.split(r"[\.\n\r!?]+", text):
+        if "port" in sentence.lower():
+            for n in re.finditer(r"\b(\d{1,5})\b", sentence):
+                num = int(n.group(1))
+                if 0 < num <= 65535:
+                    candidates.add(num)
+
+    # 3) Table-aware extraction: if a table has a header cell mentioning 'port', take numeric cells
+    for table in soup.find_all("table"):
+        # look for header cells mentioning 'port' — accept th or first-row td
+        headers = [th.get_text(" ").strip().lower() for th in table.find_all("th")]
+        if not headers:
+            # check first row td cells as fallback header
+            first_row = table.find("tr")
+            if first_row:
+                headers = [td.get_text(" ").strip().lower() for td in first_row.find_all("td")]
+
+        if any("port" in h for h in headers):
+            for td in table.find_all("td"):
+                for n in re.finditer(r"\b(\d{1,5})\b", td.get_text()):
+                    num = int(n.group(1))
+                    if 0 < num <= 65535:
+                        candidates.add(num)
+
+    # 4) Fallback: if no candidate ports were found via heuristics, fall back to any numbers in key text
+    if not candidates:
+        for n in re.finditer(r"\b(\d{1,5})\b", text):
+            num = int(n.group(1))
+            if 0 < num <= 65535:
+                candidates.add(num)
+
+    return sorted(candidates)
 
 
 def crawl(start_url: str, max_pages: int = 50, same_domain: bool = True) -> Iterable[tuple[str, list[int]]]:
