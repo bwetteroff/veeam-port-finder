@@ -26,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     crawl_p.add_argument("--no-same-domain", dest="same_domain", action="store_false", help="Do not restrict to same domain")
     crawl_p.add_argument("--json", action="store_true", help="Output results as JSON")
     crawl_p.add_argument("--output", help="Write results to an Excel file (XLSX)")
+    crawl_p.add_argument("--flat", action="store_true", help="Flatten output to one row per (url, port)")
 
     parser.add_argument("--version", action="store_true", help="Show version and exit")
 
@@ -65,21 +66,32 @@ def main(argv: list[str] | None = None) -> int:
         if getattr(args, "output", None):
             out_path = Path(args.output)
             rows = []
-            for r in results:
-                ports_list = [str(p.get("port")) for p in r["ports"]]
-                protocols_set = set()
-                services_set = set()
-                for p in r["ports"]:
-                    for pr in p.get("protocols", []):
-                        protocols_set.add(pr)
-                    for sv in p.get("services", []):
-                        services_set.add(sv)
-                rows.append({
-                    "url": r["url"],
-                    "ports": ", ".join(ports_list),
-                    "protocols": ", ".join(sorted(protocols_set)),
-                    "services": ", ".join(sorted(services_set)),
-                })
+            if getattr(args, "flat", False):
+                # one row per (url, port)
+                for r in results:
+                    for p in r["ports"]:
+                        rows.append({
+                            "url": r["url"],
+                            "port": p.get("port"),
+                            "protocols": ", ".join(p.get("protocols", [])),
+                            "services": ", ".join(p.get("services", [])),
+                        })
+            else:
+                for r in results:
+                    ports_list = [str(p.get("port")) for p in r["ports"]]
+                    protocols_set = set()
+                    services_set = set()
+                    for p in r["ports"]:
+                        for pr in p.get("protocols", []):
+                            protocols_set.add(pr)
+                        for sv in p.get("services", []):
+                            services_set.add(sv)
+                    rows.append({
+                        "url": r["url"],
+                        "ports": ", ".join(ports_list),
+                        "protocols": ", ".join(sorted(protocols_set)),
+                        "services": ", ".join(sorted(services_set)),
+                    })
             df = pd.DataFrame(rows)
             df.to_excel(out_path, index=False)
 
